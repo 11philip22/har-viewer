@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use super::types::{EntryDetail, EntrySummary, HarError, TimingBreakdown};
 
@@ -7,7 +7,7 @@ use super::types::{EntryDetail, EntrySummary, HarError, TimingBreakdown};
 struct HarEntry {
     #[serde(default)]
     started_date_time: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_f64_flexible")]
     time: f64,
     request: HarRequest,
     response: HarResponse,
@@ -28,16 +28,16 @@ struct HarRequest {
     headers: Vec<HarHeader>,
     #[serde(default)]
     post_data: Option<HarPostData>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_opt_i64_flexible")]
     headers_size: Option<i64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_opt_i64_flexible")]
     body_size: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct HarResponse {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_u16_flexible")]
     status: u16,
     #[serde(default)]
     status_text: String,
@@ -45,9 +45,9 @@ struct HarResponse {
     headers: Vec<HarHeader>,
     #[serde(default)]
     content: Option<HarContent>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_opt_i64_flexible")]
     headers_size: Option<i64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_opt_i64_flexible")]
     body_size: Option<i64>,
 }
 
@@ -69,7 +69,7 @@ struct HarPostData {
 struct HarContent {
     #[serde(default)]
     mime_type: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_opt_i64_flexible")]
     size: Option<i64>,
     #[serde(default)]
     text: Option<String>,
@@ -77,19 +77,19 @@ struct HarContent {
 
 #[derive(Debug, Default, Deserialize)]
 struct HarTimings {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_opt_f64_flexible")]
     blocked: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_opt_f64_flexible")]
     dns: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_opt_f64_flexible")]
     connect: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_opt_f64_flexible")]
     ssl: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_opt_f64_flexible")]
     send: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_opt_f64_flexible")]
     wait: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_opt_f64_flexible")]
     receive: Option<f64>,
 }
 
@@ -222,6 +222,97 @@ fn timings_to_duration(timings: &HarTimings) -> f64 {
         + clamp_duration(timings.receive)
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum NumberLike {
+    I64(i64),
+    F64(f64),
+    Str(String),
+}
+
+fn de_f64_flexible<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<NumberLike>::deserialize(deserializer)?;
+    number_like_to_f64(value, 0.0)
+}
+
+fn de_u16_flexible<'de, D>(deserializer: D) -> Result<u16, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<NumberLike>::deserialize(deserializer)?;
+    let parsed = number_like_to_i64(value, 0)?;
+    Ok(parsed.clamp(0, u16::MAX as i64) as u16)
+}
+
+fn de_opt_i64_flexible<'de, D>(deserializer: D) -> Result<Option<i64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<NumberLike>::deserialize(deserializer)?;
+    match value {
+        None => Ok(None),
+        Some(n) => Ok(Some(number_like_to_i64(Some(n), 0)?)),
+    }
+}
+
+fn de_opt_f64_flexible<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<NumberLike>::deserialize(deserializer)?;
+    match value {
+        None => Ok(None),
+        Some(n) => Ok(Some(number_like_to_f64(Some(n), 0.0)?)),
+    }
+}
+
+fn number_like_to_i64<E>(value: Option<NumberLike>, default: i64) -> Result<i64, E>
+where
+    E: serde::de::Error,
+{
+    match value {
+        None => Ok(default),
+        Some(NumberLike::I64(v)) => Ok(v),
+        Some(NumberLike::F64(v)) => Ok(v as i64),
+        Some(NumberLike::Str(v)) => {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                Ok(default)
+            } else if let Ok(parsed) = trimmed.parse::<i64>() {
+                Ok(parsed)
+            } else if let Ok(parsed) = trimmed.parse::<f64>() {
+                Ok(parsed as i64)
+            } else {
+                Err(E::custom(format!("invalid numeric value: {trimmed}")))
+            }
+        }
+    }
+}
+
+fn number_like_to_f64<E>(value: Option<NumberLike>, default: f64) -> Result<f64, E>
+where
+    E: serde::de::Error,
+{
+    match value {
+        None => Ok(default),
+        Some(NumberLike::I64(v)) => Ok(v as f64),
+        Some(NumberLike::F64(v)) => Ok(v),
+        Some(NumberLike::Str(v)) => {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                Ok(default)
+            } else if let Ok(parsed) = trimmed.parse::<f64>() {
+                Ok(parsed)
+            } else {
+                Err(E::custom(format!("invalid numeric value: {trimmed}")))
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{parse_detail, parse_summary};
@@ -287,5 +378,38 @@ mod tests {
         assert!(detail.request_body.contains("alice"));
         assert!(detail.response_body.contains("error"));
         assert_eq!(detail.timings.wait, 8.0);
+    }
+
+    #[test]
+    fn parses_string_encoded_numbers() {
+        let entry = br#"{
+          "startedDateTime":"2025-01-01T00:00:00.000Z",
+          "time":"579",
+          "request":{
+            "method":"GET",
+            "url":"https://example.com/robots.txt",
+            "headers":[],
+            "headersSize":"-1",
+            "bodySize":"23093"
+          },
+          "response":{
+            "status":"200",
+            "statusText":"OK",
+            "headers":[],
+            "content":{"mimeType":"text/plain","size":"23093","text":"hello"},
+            "headersSize":"-1",
+            "bodySize":"23093"
+          },
+          "timings":{"send":"0","wait":"579","receive":"0"}
+        }"#;
+
+        let summary = parse_summary(0, entry).expect("summary");
+        assert_eq!(summary.res_bytes, 23093);
+        assert_eq!(summary.req_bytes, 23093);
+        assert_eq!(summary.duration_ms, 579.0);
+
+        let detail = parse_detail(entry).expect("detail");
+        assert_eq!(detail.response_status, 200);
+        assert_eq!(detail.timings.wait, 579.0);
     }
 }
