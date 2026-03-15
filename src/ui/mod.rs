@@ -147,27 +147,6 @@ fn Toolbar(
             });
         }
     };
-
-    let on_min_duration = {
-        let store = store;
-        move |ev: Event| {
-            let value = event_target_value(&ev);
-            store.update(|s| {
-                s.filter.duration_min = value.parse::<f64>().ok();
-            });
-        }
-    };
-
-    let on_max_duration = {
-        let store = store;
-        move |ev: Event| {
-            let value = event_target_value(&ev);
-            store.update(|s| {
-                s.filter.duration_max = value.parse::<f64>().ok();
-            });
-        }
-    };
-
     let clear_filters = {
         let store = store;
         move |_ev: MouseEvent| {
@@ -222,9 +201,6 @@ fn Toolbar(
                     <option value="image">"image/*"</option>
                     <option value="font">"font/*"</option>
                 </select>
-
-                <input class="field short" type="number" min="0" placeholder="min ms" on:input=on_min_duration />
-                <input class="field short" type="number" min="0" placeholder="max ms" on:input=on_max_duration />
                 <button class="btn ghost" on:click=clear_filters>
                     "Reset"
                 </button>
@@ -495,3 +471,5 @@ fn format_bytes(value: u64) -> String {
         format!("{} B", value)
     }
 }
+
+

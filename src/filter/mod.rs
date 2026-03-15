@@ -15,8 +15,6 @@ pub struct FilterQuery {
     pub method: Option<String>,
     pub status_group: Option<StatusGroup>,
     pub mime_category: Option<String>,
-    pub duration_min: Option<f64>,
-    pub duration_max: Option<f64>,
 }
 
 impl FilterQuery {
@@ -45,18 +43,6 @@ impl FilterQuery {
                 if mime_head != category.to_ascii_lowercase() {
                     return false;
                 }
-            }
-        }
-
-        if let Some(min) = self.duration_min {
-            if summary.duration_ms < min {
-                return false;
-            }
-        }
-
-        if let Some(max) = self.duration_max {
-            if summary.duration_ms > max {
-                return false;
             }
         }
 
@@ -120,16 +106,6 @@ mod tests {
             ..FilterQuery::default()
         };
         assert!(query.matches(&summary));
-    }
-
-    #[test]
-    fn rejects_out_of_bounds_duration() {
-        let summary = sample(200, "POST", "application/json", 25.0);
-        let query = FilterQuery {
-            duration_min: Some(30.0),
-            ..FilterQuery::default()
-        };
-        assert!(!query.matches(&summary));
     }
 
     #[test]

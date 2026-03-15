@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `request:` pane on the left
   - `response:` pane on the right
 - Extended `EntryDetail`/parser output with request and response HTTP version fields plus explicit request method/path for raw message rendering.
+- Removed min ms and max ms duration filters from the toolbar and from filter query evaluation logic.
 
 ### Fixed
 - Fixed HAR parse failure for numeric fields encoded as strings (for example `"bodySize": "23093"`).
@@ -49,3 +50,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Verified with:
   - `cargo test`
   - `cargo check --target wasm32-unknown-unknown`
+
