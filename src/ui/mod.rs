@@ -5,14 +5,11 @@ use leptos::ev::{DragEvent, Event, KeyboardEvent, MouseEvent};
 use leptos::html;
 use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{File, HtmlElement, HtmlInputElement};
+use web_sys::{File, HtmlInputElement};
 
 use crate::filter::{FilterQuery, StatusGroup};
-use crate::har::HarIndexer;
-use crate::state::{HarStore, InspectorTab, SortColumn, SortDirection};
-
-const ROW_HEIGHT: f64 = 30.0;
-const ROW_OVERSCAN: usize = 10;
+use crate::har::{HarIndexer, build_request_message, build_response_message};
+use crate::state::{HarStore, SortColumn, SortDirection};
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -73,11 +70,12 @@ pub fn App() -> impl IntoView {
             <div
                 class="workspace"
                 node_ref=workspace_ref
+                style=move || format!("grid-template-rows: {}% 8px minmax(180px, 1fr);", top_ratio.get() * 100.0)
                 on:mousemove=on_main_mousemove
                 on:mouseup=on_main_mouseup
                 on:mouseleave=on_main_mouseup
             >
-                <div class="history-pane" style=move || format!("height: {}%;", top_ratio.get() * 100.0)>
+                <div class="history-pane">
                     <HistoryPane store=store />
                 </div>
                 <div
@@ -237,15 +235,7 @@ fn Toolbar(
 
 #[component]
 fn HistoryPane(store: RwSignal<HarStore>) -> impl IntoView {
-    let scroll_top = RwSignal::new(0.0_f64);
-    let viewport_height = RwSignal::new(320.0_f64);
     let visible_indices = Memo::new(move |_| store.with(|s| s.visible_indices()));
-
-    let on_scroll = move |ev: Event| {
-        let target = event_target::<HtmlElement>(&ev);
-        scroll_top.set(f64::from(target.scroll_top()));
-        viewport_height.set(f64::from(target.client_height()));
-    };
 
     let on_keydown = {
         let store = store;
@@ -266,27 +256,33 @@ fn HistoryPane(store: RwSignal<HarStore>) -> impl IntoView {
         }
     };
 
-    let rows = move || {
+    let body_rows = move || {
         let visible = visible_indices.get();
-        let total = visible.len();
-        let total_height = ROW_HEIGHT * total as f64;
-        let start = (scroll_top.get() / ROW_HEIGHT).floor().max(0.0) as usize;
-        let start = start.saturating_sub(ROW_OVERSCAN);
-        let visible_count =
-            (viewport_height.get() / ROW_HEIGHT).ceil().max(1.0) as usize + (ROW_OVERSCAN * 2);
-        let end = (start + visible_count).min(total);
-        let y_offset = start as f64 * ROW_HEIGHT;
-
-        let row_views = visible[start..end]
+        visible
             .iter()
             .map(|entry_idx| {
                 let idx = *entry_idx;
                 let row = store.with(|s| s.entries[idx].clone());
+                let method = row.method;
+                let method_title = method.clone();
+                let host = row.host;
+                let host_title = host.clone();
+                let path = row.path;
+                let path_title = path.clone();
+                let status = row.status;
+                let status_title = status.to_string();
+                let mime = row.mime;
+                let mime_title = mime.clone();
+                let started_at = row.started_at;
+                let started_at_title = started_at.clone();
+                let bytes_text = format_bytes(row.res_bytes);
+                let duration_text = format!("{:.1} ms", row.duration_ms);
+
                 let is_selected = move || store.with(|s| s.selected_row == Some(idx));
                 let store_for_click = store;
 
                 view! {
-                    <button
+                    <tr
                         class="history-row"
                         class:selected=is_selected
                         on:click=move |_ev: MouseEvent| {
@@ -294,47 +290,52 @@ fn HistoryPane(store: RwSignal<HarStore>) -> impl IntoView {
                             load_selected_detail(store_for_click);
                         }
                     >
-                        <span class="col method">{row.method}</span>
-                        <span class="col host">{row.host}</span>
-                        <span class="col path">{row.path}</span>
-                        <span class="col status">{row.status}</span>
-                        <span class="col mime">{row.mime}</span>
-                        <span class="col bytes">{format_bytes(row.res_bytes)}</span>
-                        <span class="col time">{row.started_at}</span>
-                        <span class="col duration">{format!("{:.1} ms", row.duration_ms)}</span>
-                    </button>
+                        <td class="col method"><span class="cell-truncate" title=method_title>{method}</span></td>
+                        <td class="col host"><span class="cell-truncate" title=host_title>{host}</span></td>
+                        <td class="col path"><span class="cell-truncate" title=path_title>{path}</span></td>
+                        <td class="col status"><span class="cell-truncate" title=status_title>{status}</span></td>
+                        <td class="col mime"><span class="cell-truncate" title=mime_title>{mime}</span></td>
+                        <td class="col bytes"><span class="cell-truncate">{bytes_text}</span></td>
+                        <td class="col time"><span class="cell-truncate" title=started_at_title>{started_at}</span></td>
+                        <td class="col duration"><span class="cell-truncate">{duration_text}</span></td>
+                    </tr>
                 }
             })
-            .collect_view();
-
-        view! {
-            <div class="history-inner" style=move || format!("height: {total_height}px;")>
-                <div class="history-virtual" style=move || format!("transform: translateY({y_offset}px);")>
-                    {row_views}
-                </div>
-            </div>
-        }
+            .collect_view()
     };
 
     view! {
         <div class="history-root">
-            <div class="history-header">
-                <SortButton label="Method" column=SortColumn::Method store=store />
-                <SortButton label="Host" column=SortColumn::Host store=store />
-                <SortButton label="Path" column=SortColumn::Path store=store />
-                <SortButton label="Status" column=SortColumn::Status store=store />
-                <SortButton label="MIME" column=SortColumn::Mime store=store />
-                <SortButton label="Resp Size" column=SortColumn::ResBytes store=store />
-                <SortButton label="Started" column=SortColumn::StartedAt store=store />
-                <SortButton label="Duration" column=SortColumn::Duration store=store />
-            </div>
-            <div class="history-scroll" tabindex="0" on:scroll=on_scroll on:keydown=on_keydown>
-                {rows}
+            <div class="history-scroll" tabindex="0" on:keydown=on_keydown>
+                <table class="history-table">
+                    <colgroup>
+                        <col class="col-method" />
+                        <col class="col-host" />
+                        <col class="col-path" />
+                        <col class="col-status" />
+                        <col class="col-mime" />
+                        <col class="col-bytes" />
+                        <col class="col-time" />
+                        <col class="col-duration" />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th><SortButton label="Method" column=SortColumn::Method store=store /></th>
+                            <th><SortButton label="Host" column=SortColumn::Host store=store /></th>
+                            <th><SortButton label="Path" column=SortColumn::Path store=store /></th>
+                            <th><SortButton label="Status" column=SortColumn::Status store=store /></th>
+                            <th><SortButton label="MIME" column=SortColumn::Mime store=store /></th>
+                            <th><SortButton label="Resp Size" column=SortColumn::ResBytes store=store /></th>
+                            <th><SortButton label="Started" column=SortColumn::StartedAt store=store /></th>
+                            <th><SortButton label="Duration" column=SortColumn::Duration store=store /></th>
+                        </tr>
+                    </thead>
+                    <tbody>{body_rows}</tbody>
+                </table>
             </div>
         </div>
     }
 }
-
 #[component]
 fn SortButton(label: &'static str, column: SortColumn, store: RwSignal<HarStore>) -> impl IntoView {
     let indicator = move || {
@@ -359,129 +360,32 @@ fn SortButton(label: &'static str, column: SortColumn, store: RwSignal<HarStore>
 
 #[component]
 fn InspectorPane(store: RwSignal<HarStore>) -> impl IntoView {
-    let side_ratio = RwSignal::new(0.32_f64);
-    let dragging_side_split = RwSignal::new(false);
-    let inspector_ref = NodeRef::<html::Div>::new();
-
-    let on_mousemove = move |ev: MouseEvent| {
-        if !dragging_side_split.get() {
-            return;
-        }
-        let Some(panel) = inspector_ref.get() else {
-            return;
-        };
-        let rect = panel.get_bounding_client_rect();
-        let x = f64::from(ev.client_x()) - rect.left();
-        let ratio = (x / rect.width()).clamp(0.2, 0.5);
-        side_ratio.set(ratio);
+    let request_message = move || {
+        store.with(|s| {
+            s.selected_detail()
+                .map(build_request_message)
+                .unwrap_or_else(|| "Select an entry to inspect request data.".to_string())
+        })
     };
 
-    let on_mouseup = move |_ev: MouseEvent| {
-        dragging_side_split.set(false);
-    };
-
-    let set_tab = {
-        let store = store;
-        move |tab: InspectorTab| {
-            store.update(|s| s.active_tab = tab);
-            load_selected_detail(store);
-        }
-    };
-
-    let summary_panel = move || {
-        let summary = store.with(|s| s.selected_summary().cloned());
-        match summary {
-            Some(row) => view! {
-                <div class="summary-card">
-                    <h3>{format!("{} {}", row.method, row.path)}</h3>
-                    <dl>
-                        <dt>"Host"</dt><dd>{row.host}</dd>
-                        <dt>"Status"</dt><dd>{row.status}</dd>
-                        <dt>"MIME"</dt><dd>{row.mime}</dd>
-                        <dt>"Request"</dt><dd>{format_bytes(row.req_bytes)}</dd>
-                        <dt>"Response"</dt><dd>{format_bytes(row.res_bytes)}</dd>
-                        <dt>"Duration"</dt><dd>{format!("{:.1} ms", row.duration_ms)}</dd>
-                    </dl>
-                </div>
-            }
-            .into_any(),
-            None => view! { <div class="summary-empty">"No entry selected"</div> }.into_any(),
-        }
-    };
-
-    let detail_content = move || {
-        let active_tab = store.with(|s| s.active_tab);
-        let detail = store.with(|s| s.selected_detail().cloned());
-
-        match (active_tab, detail) {
-            (_, None) => view! { <div class="empty-detail">"Select an entry to inspect request/response data."</div> }.into_any(),
-            (InspectorTab::Request, Some(detail)) => view! {
-                <div class="detail-grid">
-                    <h4>{detail.request_line}</h4>
-                    <pre class="code-view">{format_headers(&detail.request_headers)}</pre>
-                    <pre class="code-view body">{detail.request_body}</pre>
-                </div>
-            }
-            .into_any(),
-            (InspectorTab::Response, Some(detail)) => view! {
-                <div class="detail-grid">
-                    <h4>{format!("{} {}", detail.response_status, detail.response_reason)}</h4>
-                    <pre class="code-view">{format_headers(&detail.response_headers)}</pre>
-                    <pre class="code-view body">{detail.response_body}</pre>
-                </div>
-            }
-            .into_any(),
-            (InspectorTab::Headers, Some(detail)) => view! {
-                <div class="headers-pair">
-                    <div>
-                        <h4>"Request Headers"</h4>
-                        <pre class="code-view">{format_headers(&detail.request_headers)}</pre>
-                    </div>
-                    <div>
-                        <h4>"Response Headers"</h4>
-                        <pre class="code-view">{format_headers(&detail.response_headers)}</pre>
-                    </div>
-                </div>
-            }
-            .into_any(),
-            (InspectorTab::Timings, Some(detail)) => view! {
-                <table class="timing-table">
-                    <tbody>
-                        <tr><th>"Blocked"</th><td>{format!("{:.2}", detail.timings.blocked)}</td></tr>
-                        <tr><th>"DNS"</th><td>{format!("{:.2}", detail.timings.dns)}</td></tr>
-                        <tr><th>"Connect"</th><td>{format!("{:.2}", detail.timings.connect)}</td></tr>
-                        <tr><th>"SSL"</th><td>{format!("{:.2}", detail.timings.ssl)}</td></tr>
-                        <tr><th>"Send"</th><td>{format!("{:.2}", detail.timings.send)}</td></tr>
-                        <tr><th>"Wait"</th><td>{format!("{:.2}", detail.timings.wait)}</td></tr>
-                        <tr><th>"Receive"</th><td>{format!("{:.2}", detail.timings.receive)}</td></tr>
-                    </tbody>
-                </table>
-            }
-            .into_any(),
-        }
+    let response_message = move || {
+        store.with(|s| {
+            s.selected_detail()
+                .map(build_response_message)
+                .unwrap_or_else(|| "Select an entry to inspect response data.".to_string())
+        })
     };
 
     view! {
-        <div
-            class="inspector-layout"
-            node_ref=inspector_ref
-            on:mousemove=on_mousemove
-            on:mouseup=on_mouseup
-            on:mouseleave=on_mouseup
-        >
-            <div class="inspector-sidebar" style=move || format!("width: {}%;", side_ratio.get() * 100.0)>
-                {summary_panel}
-            </div>
-            <div class="splitter vertical" on:mousedown=move |_ev: MouseEvent| dragging_side_split.set(true)></div>
-            <div class="inspector-main">
-                <div class="tab-row">
-                    <button class="tab" class:active=move || store.with(|s| s.active_tab == InspectorTab::Request) on:click=move |_ev: MouseEvent| set_tab(InspectorTab::Request)>"Request"</button>
-                    <button class="tab" class:active=move || store.with(|s| s.active_tab == InspectorTab::Response) on:click=move |_ev: MouseEvent| set_tab(InspectorTab::Response)>"Response"</button>
-                    <button class="tab" class:active=move || store.with(|s| s.active_tab == InspectorTab::Headers) on:click=move |_ev: MouseEvent| set_tab(InspectorTab::Headers)>"Headers"</button>
-                    <button class="tab" class:active=move || store.with(|s| s.active_tab == InspectorTab::Timings) on:click=move |_ev: MouseEvent| set_tab(InspectorTab::Timings)>"Timings"</button>
-                </div>
-                <div class="tab-content">{detail_content}</div>
-            </div>
+        <div class="message-split">
+            <section class="message-panel">
+                <h4 class="message-title">"request:"</h4>
+                <pre class="message-view">{request_message}</pre>
+            </section>
+            <section class="message-panel">
+                <h4 class="message-title">"response:"</h4>
+                <pre class="message-view">{response_message}</pre>
+            </section>
         </div>
     }
 }
@@ -573,14 +477,6 @@ fn load_selected_detail(store: RwSignal<HarStore>) {
             store.update(|s| s.set_error(error.to_string()));
         }
     }
-}
-
-fn format_headers(headers: &[(String, String)]) -> String {
-    headers
-        .iter()
-        .map(|(name, value)| format!("{name}: {value}"))
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 fn format_bytes(value: u64) -> String {

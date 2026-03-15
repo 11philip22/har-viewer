@@ -8,54 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Created initial Rust project scaffold for a client-only WebAssembly HAR viewer (`Leptos` CSR + `Trunk`).
-- Added app entrypoints and module structure:
-  - `src/lib.rs`
-  - `src/main.rs`
-  - `src/har/*`
-  - `src/filter/*`
-  - `src/state/*`
-  - `src/ui/*`
-- Added web app bootstrap files:
-  - `index.html`
-  - `style/main.css`
-- Implemented HAR domain model and interfaces:
-  - `EntrySummary`, `EntryDetail`, `EntryRange`, `IndexResult`, `IndexStats`
-  - `HarIndexer::index`, `HarIndexer::load_detail`
-  - `HarIndexer::index_cooperative` (cooperative async indexing for UI responsiveness)
-- Implemented Stage A HAR scanner (`log.entries` byte-range extraction) without loading full JSON trees.
-- Implemented Stage B entry parsing for:
-  - table summaries (method/host/path/status/mime/sizes/duration)
-  - on-demand detail loading (request/response line, headers, bodies, timings)
-- Implemented filter/query engine:
-  - global text search
-  - method filter
-  - status group filter (1xx-5xx)
-  - MIME category filter
-  - duration min/max
-- Implemented app state store with:
-  - loaded bytes/ranges/summaries
-  - selection and tab state
-  - stable sorting (column + direction)
-  - detail cache
-  - indexing progress + error state
-- Implemented Burp-style HTTP history UI shell:
-  - top virtualized history table
-  - bottom inspector with `Request`, `Response`, `Headers`, `Timings` tabs
-  - horizontal and vertical draggable splitters
-  - keyboard row navigation
-  - sortable table headers
-  - status/progress footer
-- Implemented local HAR loading UX:
-  - file picker
-  - drag-and-drop import
-- Added responsive styling/theme for desktop/mobile layouts.
+- Added app/module structure and web bootstrap files (`src/*`, `index.html`, `style/main.css`).
+- Implemented HAR scanner/indexer/parser pipeline with summary indexing and on-demand detail loading.
+- Implemented filtering, sorting, selection state, and virtualized HTTP history table.
+- Added local HAR import via file picker and drag-and-drop.
+- Added raw HTTP message formatter helpers:
+  - request message builder (`METHOD path HTTP/x` + headers + body)
+  - response message builder (`HTTP/x status reason` + headers + body)
+  - JSON prettification when body is valid JSON
 
 ### Changed
-- Updated `Cargo.toml` with WebAssembly and app dependencies (`leptos`, `web-sys`, `gloo-file`, `gloo-timers`, `serde`, `serde_json`, `url`, `thiserror`, etc.) and `cdylib` output support.
+- Updated `Cargo.toml` with WebAssembly and app dependencies (`leptos`, `web-sys`, `gloo-file`, `gloo-timers`, `serde`, `serde_json`, `url`, `thiserror`) and `cdylib` output support.
 - Added `gloo-file` `futures` feature to support async file reads in WASM.
+- Replaced the bottom tabbed inspector with a fixed split view:
+  - `request:` pane on the left
+  - `response:` pane on the right
+- Extended `EntryDetail`/parser output with request and response HTTP version fields plus explicit request method/path for raw message rendering.
 
 ### Fixed
-- Fixed HAR parse failure for files that encode numeric fields as strings (example: `"bodySize": "23093"`).
+- Fixed HAR parse failure for numeric fields encoded as strings (for example `"bodySize": "23093"`).
 - Parser now accepts flexible number representations (numeric or string) for:
   - `time`
   - `status`
@@ -63,16 +34,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `bodySize`
   - `content.size`
   - timing values (`blocked`, `dns`, `connect`, `ssl`, `send`, `wait`, `receive`)
-- Added regression test coverage for string-encoded numeric HAR values.
+- Removed UI truncation in the history table (no ellipsis/clipping; full values available via scrolling).
 
 ### Tests
 - Added/maintained unit tests for:
   - scanner correctness and escaped-string handling
   - summary parsing and optional fields
-  - detail loading via selected byte range
-  - filter behavior
-  - synthetic large-payload indexing guard
-  - string-encoded numeric field parsing
+  - detail loading by selected byte range
+  - string-encoded numeric parsing
+  - HTTP version fallback when missing
+  - request/response raw message formatting
+  - JSON pretty-print behavior (valid JSON vs invalid JSON)
+  - host fallback rendering when request `Host` header is absent
 - Verified with:
   - `cargo test`
   - `cargo check --target wasm32-unknown-unknown`

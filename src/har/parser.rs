@@ -25,6 +25,8 @@ struct HarRequest {
     method: String,
     url: String,
     #[serde(default)]
+    http_version: Option<String>,
+    #[serde(default)]
     headers: Vec<HarHeader>,
     #[serde(default)]
     post_data: Option<HarPostData>,
@@ -41,6 +43,8 @@ struct HarResponse {
     status: u16,
     #[serde(default)]
     status_text: String,
+    #[serde(default)]
+    http_version: Option<String>,
     #[serde(default)]
     headers: Vec<HarHeader>,
     #[serde(default)]
@@ -135,7 +139,6 @@ pub fn parse_detail(entry_slice: &[u8]) -> Result<EntryDetail, HarError> {
     let entry: HarEntry = serde_json::from_slice(entry_slice)?;
 
     let (_, path) = split_url(&entry.request.url);
-    let request_line = format!("{} {}", entry.request.method, path);
 
     let request_headers = entry
         .request
@@ -175,10 +178,17 @@ pub fn parse_detail(entry_slice: &[u8]) -> Result<EntryDetail, HarError> {
     };
 
     Ok(EntryDetail {
-        request_line,
+        request_method: entry.request.method,
+        request_path: if path.is_empty() {
+            "/".to_string()
+        } else {
+            path
+        },
+        request_http_version: normalize_http_version(entry.request.http_version.as_deref()),
         url: entry.request.url,
         request_headers,
         request_body,
+        response_http_version: normalize_http_version(entry.response.http_version.as_deref()),
         response_status: entry.response.status,
         response_reason: entry.response.status_text,
         response_headers,
@@ -201,6 +211,20 @@ fn split_url(raw: &str) -> (String, String) {
             (host, path)
         }
         Err(_) => ("-".to_string(), raw.to_string()),
+    }
+}
+
+fn normalize_http_version(version: Option<&str>) -> String {
+    let normalized = version
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_ascii_uppercase())
+        .unwrap_or_else(|| "HTTP/1.1".to_string());
+
+    if normalized.starts_with("HTTP/") {
+        normalized
+    } else {
+        "HTTP/1.1".to_string()
     }
 }
 
@@ -360,12 +384,14 @@ mod tests {
           "request":{
             "method":"POST",
             "url":"https://example.com/login",
+            "httpVersion":"HTTP/2",
             "headers":[{"name":"content-type","value":"application/json"}],
             "postData":{"text":"{\"user\":\"alice\"}"}
           },
           "response":{
             "status":401,
             "statusText":"Unauthorized",
+            "httpVersion":"HTTP/2",
             "headers":[{"name":"content-type","value":"application/json"}],
             "content":{"mimeType":"application/json","text":"{\"error\":\"bad creds\"}"}
           },
@@ -373,7 +399,10 @@ mod tests {
         }"#;
 
         let detail = parse_detail(entry).expect("detail");
-        assert_eq!(detail.request_line, "POST /login");
+        assert_eq!(detail.request_method, "POST");
+        assert_eq!(detail.request_path, "/login");
+        assert_eq!(detail.request_http_version, "HTTP/2");
+        assert_eq!(detail.response_http_version, "HTTP/2");
         assert_eq!(detail.response_status, 401);
         assert!(detail.request_body.contains("alice"));
         assert!(detail.response_body.contains("error"));
@@ -411,5 +440,28 @@ mod tests {
         let detail = parse_detail(entry).expect("detail");
         assert_eq!(detail.response_status, 200);
         assert_eq!(detail.timings.wait, 579.0);
+    }
+
+    #[test]
+    fn defaults_http_version_when_missing() {
+        let entry = br#"{
+          "startedDateTime":"2025-01-01T00:00:00.000Z",
+          "time":1,
+          "request":{
+            "method":"GET",
+            "url":"https://example.com/",
+            "headers":[]
+          },
+          "response":{
+            "status":200,
+            "statusText":"OK",
+            "headers":[]
+          },
+          "timings":{}
+        }"#;
+
+        let detail = parse_detail(entry).expect("detail");
+        assert_eq!(detail.request_http_version, "HTTP/1.1");
+        assert_eq!(detail.response_http_version, "HTTP/1.1");
     }
 }

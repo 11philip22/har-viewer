@@ -43,10 +43,13 @@ pub struct TimingBreakdown {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntryDetail {
-    pub request_line: String,
+    pub request_method: String,
+    pub request_path: String,
+    pub request_http_version: String,
     pub url: String,
     pub request_headers: Vec<(String, String)>,
     pub request_body: String,
+    pub response_http_version: String,
     pub response_status: u16,
     pub response_reason: String,
     pub response_headers: Vec<(String, String)>,

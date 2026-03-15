@@ -6,14 +6,6 @@ use crate::filter::FilterQuery;
 use crate::har::{EntryDetail, EntryRange, EntrySummary, IndexResult, IndexStats};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InspectorTab {
-    Request,
-    Response,
-    Headers,
-    Timings,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortColumn {
     StartedAt,
     Method,
@@ -53,7 +45,6 @@ pub struct HarStore {
     pub entries: Vec<EntrySummary>,
     pub entry_ranges: Vec<EntryRange>,
     pub selected_row: Option<usize>,
-    pub active_tab: InspectorTab,
     pub filter: FilterQuery,
     pub sort: SortConfig,
     pub details: HashMap<usize, EntryDetail>,
@@ -70,7 +61,6 @@ impl Default for HarStore {
             entries: Vec::new(),
             entry_ranges: Vec::new(),
             selected_row: None,
-            active_tab: InspectorTab::Request,
             filter: FilterQuery::default(),
             sort: SortConfig::default(),
             details: HashMap::new(),
@@ -88,7 +78,6 @@ impl HarStore {
         self.entries.clear();
         self.entry_ranges.clear();
         self.selected_row = None;
-        self.active_tab = InspectorTab::Request;
         self.details.clear();
         self.stats = None;
         self.indexing = false;

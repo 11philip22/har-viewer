@@ -1,7 +1,9 @@
+mod message;
 mod parser;
 mod scanner;
 mod types;
 
+pub use message::{build_request_message, build_response_message, pretty_json_if_possible};
 pub use types::{
     EntryDetail, EntryRange, EntrySummary, HarError, IndexResult, IndexStats, TimingBreakdown,
 };
