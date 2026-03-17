@@ -20,7 +20,7 @@ pub fn App() -> impl IntoView {
     let workspace_ref = NodeRef::<html::Div>::new();
     let file_input_ref = NodeRef::<html::Input>::new();
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let value = theme.get();
         apply_theme(&value);
     });
@@ -529,6 +529,7 @@ fn format_bytes(value: u64) -> String {
         format!("{} B", value)
     }
 }
+
 
 
 
