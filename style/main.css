@@ -123,6 +123,10 @@ a:focus-visible {
   padding: 7px 12px;
 }
 
+.theme-toggle {
+  padding: 7px 12px;
+}
+
 .btn.ghost {
   background: transparent;
 }
