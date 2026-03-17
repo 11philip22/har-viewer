@@ -364,14 +364,12 @@ a:focus-visible {
   color: var(--muted);
 }
 
-.texture-void,
-.texture-scan {
+.texture-void {
   position: relative;
   overflow: hidden;
 }
 
-.texture-void::before,
-.texture-scan::before {
+.texture-void::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -393,18 +391,7 @@ a:focus-visible {
     );
 }
 
-.texture-scan::before {
-  background-image: repeating-linear-gradient(
-    0deg,
-    var(--texture-ink) 0,
-    var(--texture-ink) 1px,
-    transparent 1px,
-    transparent 4px
-  );
-}
-
-.texture-void > *,
-.texture-scan > * {
+.texture-void > * {
   position: relative;
   z-index: 1;
 }

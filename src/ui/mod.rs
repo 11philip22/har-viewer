@@ -310,7 +310,7 @@ fn HistoryPane(store: RwSignal<HarStore>) -> impl IntoView {
     };
 
     view! {
-        <div class="history-root texture-scan">
+        <div class="history-root">
             <div class="history-scroll" tabindex="0" on:keydown=on_keydown>
                 <table class="history-table">
                     <colgroup>
@@ -383,11 +383,11 @@ fn InspectorPane(store: RwSignal<HarStore>) -> impl IntoView {
 
     view! {
         <div class="message-split">
-            <section class="message-panel texture-scan">
+            <section class="message-panel">
                 <h4 class="message-title">"request:"</h4>
                 <pre class="message-view">{request_message}</pre>
             </section>
-            <section class="message-panel texture-scan">
+            <section class="message-panel">
                 <h4 class="message-title">"response:"</h4>
                 <pre class="message-view">{response_message}</pre>
             </section>
