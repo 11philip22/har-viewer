@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added theme toggle with persisted preference (localStorage).
+- Added texture overlays (void/scan) on the header, panels, and status bar.
 - Created initial Rust project scaffold for a client-only WebAssembly HAR viewer (`Leptos` CSR + `Trunk`).
 - Added app/module structure and web bootstrap files (`src/*`, `index.html`, `style/main.css`).
 - Implemented HAR scanner/indexer/parser pipeline with summary indexing and on-demand detail loading.
@@ -18,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - JSON prettification when body is valid JSON
 
 ### Changed
+- Updated the UI styling to the Woldhack visual system (tokens, mono typography, square borders, accent-driven interactions).
 - Updated `Cargo.toml` with WebAssembly and app dependencies (`leptos`, `web-sys`, `gloo-file`, `gloo-timers`, `serde`, `serde_json`, `url`, `thiserror`) and `cdylib` output support.
 - Added `gloo-file` `futures` feature to support async file reads in WASM.
 - Replaced the bottom tabbed inspector with a fixed split view:
@@ -50,4 +53,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Verified with:
   - `cargo test`
   - `cargo check --target wasm32-unknown-unknown`
-

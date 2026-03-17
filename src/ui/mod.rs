@@ -14,10 +14,16 @@ use crate::state::{HarStore, SortColumn, SortDirection};
 #[component]
 pub fn App() -> impl IntoView {
     let store = RwSignal::new(HarStore::default());
+    let theme = RwSignal::new(load_theme());
     let top_ratio = RwSignal::new(0.55_f64);
     let dragging_main_split = RwSignal::new(false);
     let workspace_ref = NodeRef::<html::Div>::new();
     let file_input_ref = NodeRef::<html::Input>::new();
+
+    create_effect(move |_| {
+        let value = theme.get();
+        apply_theme(&value);
+    });
 
     let on_main_mousemove = move |ev: MouseEvent| {
         if !dragging_main_split.get() {
@@ -66,7 +72,7 @@ pub fn App() -> impl IntoView {
 
     view! {
         <div class="app-shell" on:dragover=move |ev: DragEvent| ev.prevent_default() on:drop=on_drop>
-            <Toolbar store=store file_input_ref=file_input_ref on_file_change=on_file_change />
+            <Toolbar store=store file_input_ref=file_input_ref on_file_change=on_file_change theme=theme />
             <div
                 class="workspace"
                 node_ref=workspace_ref
@@ -96,6 +102,7 @@ fn Toolbar(
     store: RwSignal<HarStore>,
     file_input_ref: NodeRef<html::Input>,
     on_file_change: impl Fn(Event) + 'static + Copy,
+    theme: RwSignal<String>,
 ) -> impl IntoView {
     let open_picker = move |_ev: MouseEvent| {
         if let Some(input) = file_input_ref.get() {
@@ -154,8 +161,21 @@ fn Toolbar(
         }
     };
 
+    let toggle_theme = {
+        let theme = theme;
+        move |_ev: MouseEvent| {
+            theme.update(|value| {
+                if value.as_str() == "light" {
+                    *value = "dark".to_string();
+                } else {
+                    *value = "light".to_string();
+                }
+            });
+        }
+    };
+
     view! {
-        <header class="toolbar">
+        <header class="toolbar texture-void">
             <div class="toolbar-group">
                 <button class="btn" on:click=open_picker>
                     "Import HAR"
@@ -203,6 +223,15 @@ fn Toolbar(
                 </select>
                 <button class="btn ghost" on:click=clear_filters>
                     "Reset"
+                </button>
+                <button class="theme-toggle" on:click=toggle_theme>
+                    {move || {
+                        if theme.get() == "light" {
+                            "Theme: Light"
+                        } else {
+                            "Theme: Dark"
+                        }
+                    }}
                 </button>
             </div>
         </header>
@@ -281,7 +310,7 @@ fn HistoryPane(store: RwSignal<HarStore>) -> impl IntoView {
     };
 
     view! {
-        <div class="history-root">
+        <div class="history-root texture-scan">
             <div class="history-scroll" tabindex="0" on:keydown=on_keydown>
                 <table class="history-table">
                     <colgroup>
@@ -354,11 +383,11 @@ fn InspectorPane(store: RwSignal<HarStore>) -> impl IntoView {
 
     view! {
         <div class="message-split">
-            <section class="message-panel">
+            <section class="message-panel texture-scan">
                 <h4 class="message-title">"request:"</h4>
                 <pre class="message-view">{request_message}</pre>
             </section>
-            <section class="message-panel">
+            <section class="message-panel texture-scan">
                 <h4 class="message-title">"response:"</h4>
                 <pre class="message-view">{response_message}</pre>
             </section>
@@ -389,7 +418,36 @@ fn StatusBar(store: RwSignal<HarStore>) -> impl IntoView {
         })
     };
 
-    view! { <footer class="status-bar">{text}</footer> }
+    view! { <footer class="status-bar texture-void">{text}</footer> }
+}
+
+fn load_theme() -> String {
+    let Some(window) = web_sys::window() else {
+        return "dark".to_string();
+    };
+
+    if let Ok(Some(storage)) = window.local_storage() {
+        if let Ok(Some(value)) = storage.get_item("har-viewer-theme") {
+            if value == "light" {
+                return value;
+            }
+        }
+    }
+
+    "dark".to_string()
+}
+
+fn apply_theme(theme: &str) {
+    if let Some(window) = web_sys::window() {
+        if let Some(document) = window.document() {
+            if let Some(root) = document.document_element() {
+                let _ = root.set_attribute("data-theme", theme);
+            }
+        }
+        if let Ok(Some(storage)) = window.local_storage() {
+            let _ = storage.set_item("har-viewer-theme", theme);
+        }
+    }
 }
 
 fn load_har_file(file: File, store: RwSignal<HarStore>) {
@@ -471,5 +529,9 @@ fn format_bytes(value: u64) -> String {
         format!("{} B", value)
     }
 }
+
+
+
+
 
 
