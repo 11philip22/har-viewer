@@ -175,7 +175,7 @@ fn Toolbar(
     };
 
     view! {
-        <header class="toolbar texture-void">
+        <header class="toolbar">
             <div class="toolbar-group">
                 <button class="btn" on:click=open_picker>
                     "Import HAR"
@@ -418,7 +418,7 @@ fn StatusBar(store: RwSignal<HarStore>) -> impl IntoView {
         })
     };
 
-    view! { <footer class="status-bar texture-void">{text}</footer> }
+    view! { <footer class="status-bar">{text}</footer> }
 }
 
 fn load_theme() -> String {

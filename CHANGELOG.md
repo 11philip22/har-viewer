@@ -21,7 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Updated the UI styling to the Woldhack visual system (tokens, mono typography, square borders, accent-driven interactions).
-- Remove the `texture-scan` class and related styles to simplify and clean up UI component styling.
+- Remove the glow effect by dropping the `texture-scan` class and related styles.
 - Updated `Cargo.toml` with WebAssembly and app dependencies (`leptos`, `web-sys`, `gloo-file`, `gloo-timers`, `serde`, `serde_json`, `url`, `thiserror`) and `cdylib` output support.
 - Added `gloo-file` `futures` feature to support async file reads in WASM.
 - Replaced the bottom tabbed inspector with a fixed split view:

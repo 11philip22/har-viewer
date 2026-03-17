@@ -13,9 +13,6 @@
   --max-width: 1080px;
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
     "Liberation Mono", monospace;
-  --texture-ink: rgba(255, 255, 255, 0.08);
-  --texture-ink-strong: rgba(255, 255, 255, 0.16);
-  --texture-opacity: 0.45;
 }
 
 [data-theme="light"] {
@@ -29,9 +26,6 @@
   --input-border: #c0beb6;
   --input-text: #1a1a14;
   --secondary-stroke: #111111;
-  --texture-ink: rgba(0, 0, 0, 0.08);
-  --texture-ink-strong: rgba(0, 0, 0, 0.14);
-  --texture-opacity: 0.5;
 }
 
 *,
@@ -362,38 +356,6 @@ a:focus-visible {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
-}
-
-.texture-void {
-  position: relative;
-  overflow: hidden;
-}
-
-.texture-void::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: var(--texture-opacity);
-}
-
-.texture-void::before {
-  background-image: radial-gradient(
-      circle at 18% 5%,
-      var(--texture-ink-strong),
-      transparent 55%
-    ),
-    radial-gradient(
-      circle at 80% 0%,
-      var(--texture-ink),
-      transparent 60%
-    );
-}
-
-.texture-void > * {
-  position: relative;
-  z-index: 1;
 }
 
 @media (max-width: 1000px) {
