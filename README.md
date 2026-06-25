@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="assets/hero-banner.png" alt="hero pane" width="980">
-</p>
+<h1 align="center">HAR Viewer</h1>
 
 <p align="center">
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-2024-3B82F6?style=for-the-badge&logo=rust&logoColor=white" alt="Rust 2024"></a>
