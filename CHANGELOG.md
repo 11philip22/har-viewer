@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-29
+
+### Changed
+- Simplified HAR viewer internals by removing unused indexing stats, detail caching, request-size sort plumbing, public module exports, and the direct `wasm-bindgen` dependency.
+
+### Removed
+- Removed unused tracked icon copies under `assets/icons/`.
+- Removed Rust unit test modules from the filter, HAR parser, scanner, message formatter, and HAR module.
+
 ## [0.1.0] - 2026-03-23
 
 ### Added
