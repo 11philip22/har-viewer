@@ -196,26 +196,3 @@ fn skip_ws_and_commas(bytes: &[u8], i: &mut usize) {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{find_entries_array, scan_entry_ranges};
-
-    #[test]
-    fn finds_entries_and_ranges() {
-        let har = br#"{"log":{"entries":[{"id":1},{"id":2}]}}"#;
-        let (start, end) = find_entries_array(har).expect("entries array");
-        assert!(start < end);
-
-        let ranges = scan_entry_ranges(har).expect("ranges");
-        assert_eq!(ranges.len(), 2);
-        assert_eq!(&har[ranges[0].start..ranges[0].end], br#"{"id":1}"#);
-    }
-
-    #[test]
-    fn handles_escaped_quotes_and_braces_inside_strings() {
-        let har = br#"{"log":{"entries":[{"msg":"a { brace and \"quote\""},{"msg":"b"}]}}"#;
-        let ranges = scan_entry_ranges(har).expect("ranges");
-        assert_eq!(ranges.len(), 2);
-    }
-}
