@@ -9,8 +9,6 @@
   --input-border: #1e1e18;
   --input-text: #c8c6bc;
   --accent: #f97316;
-  --secondary-stroke: #2e2e26;
-  --max-width: 1080px;
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
     "Liberation Mono", monospace;
 }
@@ -25,7 +23,6 @@
   --input-bg: #f2f1ea;
   --input-border: #c0beb6;
   --input-text: #1a1a14;
-  --secondary-stroke: #111111;
 }
 
 *,
@@ -147,10 +144,6 @@ a:focus-visible {
 
 .field {
   padding: 7px 8px;
-}
-
-.field.short {
-  width: 88px;
 }
 
 .btn:hover,

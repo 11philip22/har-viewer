@@ -1,6 +1,6 @@
 use serde::{Deserialize, Deserializer};
 
-use super::types::{EntryDetail, EntrySummary, HarError, TimingBreakdown};
+use super::types::{EntryDetail, EntrySummary, HarError};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,10 +11,6 @@ struct HarEntry {
     time: f64,
     request: HarRequest,
     response: HarResponse,
-    #[serde(default)]
-    server_ip_address: Option<String>,
-    #[serde(default)]
-    connection: Option<String>,
     #[serde(default)]
     timings: HarTimings,
 }
@@ -30,10 +26,6 @@ struct HarRequest {
     headers: Vec<HarHeader>,
     #[serde(default)]
     post_data: Option<HarPostData>,
-    #[serde(default, deserialize_with = "de_opt_i64_flexible")]
-    headers_size: Option<i64>,
-    #[serde(default, deserialize_with = "de_opt_i64_flexible")]
-    body_size: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -109,8 +101,6 @@ pub fn parse_summary(id: usize, entry_slice: &[u8]) -> Result<EntrySummary, HarE
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| "-".to_string());
 
-    let req_bytes = clamp_size(entry.request.headers_size) + clamp_size(entry.request.body_size);
-
     let response_content_size = entry.response.content.as_ref().and_then(|c| c.size);
     let res_body_size = clamp_size(entry.response.body_size).max(clamp_size(response_content_size));
     let res_bytes = clamp_size(entry.response.headers_size) + res_body_size;
@@ -129,7 +119,6 @@ pub fn parse_summary(id: usize, entry_slice: &[u8]) -> Result<EntrySummary, HarE
         path,
         status: entry.response.status,
         mime,
-        req_bytes,
         res_bytes,
         duration_ms,
     })
@@ -167,16 +156,6 @@ pub fn parse_detail(entry_slice: &[u8]) -> Result<EntryDetail, HarError> {
         .and_then(|content| content.text.clone())
         .unwrap_or_default();
 
-    let timings = TimingBreakdown {
-        blocked: clamp_duration(entry.timings.blocked),
-        dns: clamp_duration(entry.timings.dns),
-        connect: clamp_duration(entry.timings.connect),
-        ssl: clamp_duration(entry.timings.ssl),
-        send: clamp_duration(entry.timings.send),
-        wait: clamp_duration(entry.timings.wait),
-        receive: clamp_duration(entry.timings.receive),
-    };
-
     Ok(EntryDetail {
         request_method: entry.request.method,
         request_path: if path.is_empty() {
@@ -193,9 +172,6 @@ pub fn parse_detail(entry_slice: &[u8]) -> Result<EntryDetail, HarError> {
         response_reason: entry.response.status_text,
         response_headers,
         response_body,
-        timings,
-        server_ip: entry.server_ip_address,
-        connection: entry.connection,
     })
 }
 
@@ -371,7 +347,6 @@ mod tests {
         assert_eq!(summary.path, "/api?q=1");
         assert_eq!(summary.status, 200);
         assert_eq!(summary.mime, "application/json");
-        assert_eq!(summary.req_bytes, 100);
         assert_eq!(summary.res_bytes, 192);
         assert_eq!(summary.duration_ms, 123.4);
     }
@@ -406,7 +381,6 @@ mod tests {
         assert_eq!(detail.response_status, 401);
         assert!(detail.request_body.contains("alice"));
         assert!(detail.response_body.contains("error"));
-        assert_eq!(detail.timings.wait, 8.0);
     }
 
     #[test]
@@ -434,12 +408,10 @@ mod tests {
 
         let summary = parse_summary(0, entry).expect("summary");
         assert_eq!(summary.res_bytes, 23093);
-        assert_eq!(summary.req_bytes, 23093);
         assert_eq!(summary.duration_ms, 579.0);
 
         let detail = parse_detail(entry).expect("detail");
         assert_eq!(detail.response_status, 200);
-        assert_eq!(detail.timings.wait, 579.0);
     }
 
     #[test]

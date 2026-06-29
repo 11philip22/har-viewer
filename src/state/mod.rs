@@ -1,9 +1,8 @@
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::filter::FilterQuery;
-use crate::har::{EntryDetail, EntryRange, EntrySummary, IndexResult, IndexStats};
+use crate::har::{EntryDetail, EntryRange, EntrySummary, IndexResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortColumn {
@@ -13,7 +12,6 @@ pub enum SortColumn {
     Path,
     Status,
     Mime,
-    ReqBytes,
     ResBytes,
     Duration,
 }
@@ -47,8 +45,7 @@ pub struct HarStore {
     pub selected_row: Option<usize>,
     pub filter: FilterQuery,
     pub sort: SortConfig,
-    pub details: HashMap<usize, EntryDetail>,
-    pub stats: Option<IndexStats>,
+    pub detail: Option<EntryDetail>,
     pub indexing: bool,
     pub indexing_progress: f32,
     pub error: Option<String>,
@@ -63,8 +60,7 @@ impl Default for HarStore {
             selected_row: None,
             filter: FilterQuery::default(),
             sort: SortConfig::default(),
-            details: HashMap::new(),
-            stats: None,
+            detail: None,
             indexing: false,
             indexing_progress: 0.0,
             error: None,
@@ -78,8 +74,7 @@ impl HarStore {
         self.entries.clear();
         self.entry_ranges.clear();
         self.selected_row = None;
-        self.details.clear();
-        self.stats = None;
+        self.detail = None;
         self.indexing = false;
         self.indexing_progress = 0.0;
         self.error = None;
@@ -94,8 +89,7 @@ impl HarStore {
         self.file_bytes = Some(bytes);
         self.entries = result.summaries;
         self.entry_ranges = result.ranges;
-        self.stats = Some(result.stats);
-        self.details.clear();
+        self.detail = None;
         self.selected_row = if self.entries.is_empty() {
             None
         } else {
@@ -145,12 +139,8 @@ impl HarStore {
         }
     }
 
-    pub fn selected_summary(&self) -> Option<&EntrySummary> {
-        self.selected_row.and_then(|idx| self.entries.get(idx))
-    }
-
     pub fn selected_detail(&self) -> Option<&EntryDetail> {
-        self.selected_row.and_then(|idx| self.details.get(&idx))
+        self.detail.as_ref()
     }
 
     pub fn selected_range(&self) -> Option<EntryRange> {
@@ -161,6 +151,7 @@ impl HarStore {
     pub fn move_selection(&mut self, delta: isize, visible: &[usize]) {
         if visible.is_empty() {
             self.selected_row = None;
+            self.detail = None;
             return;
         }
 
@@ -176,6 +167,7 @@ impl HarStore {
         };
 
         self.selected_row = Some(visible[next_position]);
+        self.detail = None;
     }
 }
 
@@ -187,7 +179,6 @@ fn compare_entries(left: &EntrySummary, right: &EntrySummary, column: SortColumn
         SortColumn::Path => left.path.cmp(&right.path),
         SortColumn::Status => left.status.cmp(&right.status),
         SortColumn::Mime => left.mime.cmp(&right.mime),
-        SortColumn::ReqBytes => left.req_bytes.cmp(&right.req_bytes),
         SortColumn::ResBytes => left.res_bytes.cmp(&right.res_bytes),
         SortColumn::Duration => left
             .duration_ms

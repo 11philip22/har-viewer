@@ -7,8 +7,8 @@ use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{File, HtmlInputElement};
 
-use crate::filter::{FilterQuery, StatusGroup};
-use crate::har::{HarIndexer, build_request_message, build_response_message};
+use crate::filter::FilterQuery;
+use crate::har::{build_request_message, build_response_message, index_cooperative, load_detail};
 use crate::state::{HarStore, SortColumn, SortDirection};
 
 #[component]
@@ -133,14 +133,7 @@ fn Toolbar(
         move |ev: Event| {
             let value = event_target_value(&ev);
             store.update(|s| {
-                s.filter.status_group = match value.as_str() {
-                    "1xx" => Some(StatusGroup::Informational),
-                    "2xx" => Some(StatusGroup::Success),
-                    "3xx" => Some(StatusGroup::Redirect),
-                    "4xx" => Some(StatusGroup::ClientError),
-                    "5xx" => Some(StatusGroup::ServerError),
-                    _ => None,
-                };
+                s.filter.status_class = value.parse().ok();
             });
         }
     };
@@ -207,11 +200,11 @@ fn Toolbar(
 
                 <select class="field" on:change=on_status_change>
                     <option value="">"All Status"</option>
-                    <option value="1xx">"1xx"</option>
-                    <option value="2xx">"2xx"</option>
-                    <option value="3xx">"3xx"</option>
-                    <option value="4xx">"4xx"</option>
-                    <option value="5xx">"5xx"</option>
+                    <option value="1">"1xx"</option>
+                    <option value="2">"2xx"</option>
+                    <option value="3">"3xx"</option>
+                    <option value="4">"4xx"</option>
+                    <option value="5">"5xx"</option>
                 </select>
 
                 <select class="field" on:change=on_mime_change>
@@ -291,7 +284,10 @@ fn HistoryPane(store: RwSignal<HarStore>) -> impl IntoView {
                         class="history-row"
                         class:selected=is_selected
                         on:click=move |_ev: MouseEvent| {
-                            store_for_click.update(|s| s.selected_row = Some(idx));
+                            store_for_click.update(|s| {
+                                s.selected_row = Some(idx);
+                                s.detail = None;
+                            });
                             load_selected_detail(store_for_click);
                         }
                     >
@@ -406,11 +402,10 @@ fn StatusBar(store: RwSignal<HarStore>) -> impl IntoView {
                 return format!("Indexing HAR... {:.0}%", s.indexing_progress * 100.0);
             }
 
-            match s.stats {
-                Some(stats) => format!(
-                    "Entries: {} | Indexed bytes: {} | Visible: {}",
-                    stats.entry_count,
-                    format_bytes(stats.indexed_bytes as u64),
+            match s.file_bytes {
+                Some(_) => format!(
+                    "Entries: {} | Visible: {}",
+                    s.entries.len(),
                     s.visible_indices().len()
                 ),
                 None => "Drop a HAR file to begin.".to_string(),
@@ -464,7 +459,7 @@ fn load_har_file(file: File, store: RwSignal<HarStore>) {
 
         let bytes_arc: Arc<[u8]> = bytes.into();
 
-        let index_result = HarIndexer::index_cooperative(bytes_arc.as_ref(), |done, total| {
+        let index_result = index_cooperative(bytes_arc.as_ref(), |done, total| {
             let progress = if total == 0 {
                 1.0
             } else {
@@ -488,24 +483,18 @@ fn load_har_file(file: File, store: RwSignal<HarStore>) {
 
 fn load_selected_detail(store: RwSignal<HarStore>) {
     let maybe_load = store.with(|s| {
-        let selected = s.selected_row?;
-        if s.details.contains_key(&selected) {
-            return None;
-        }
         let bytes = s.file_bytes.clone()?;
-        let range = *s.entry_ranges.get(selected)?;
-        Some((selected, bytes, range))
+        let range = *s.entry_ranges.get(s.selected_row?)?;
+        Some((bytes, range))
     });
 
-    let Some((selected, bytes, range)) = maybe_load else {
+    let Some((bytes, range)) = maybe_load else {
         return;
     };
 
-    match HarIndexer::load_detail(bytes.as_ref(), range) {
+    match load_detail(bytes.as_ref(), range) {
         Ok(detail) => {
-            store.update(|s| {
-                s.details.insert(selected, detail);
-            });
+            store.update(|s| s.detail = Some(detail));
         }
         Err(error) => {
             store.update(|s| s.set_error(error.to_string()));
@@ -529,10 +518,3 @@ fn format_bytes(value: u64) -> String {
         format!("{} B", value)
     }
 }
-
-
-
-
-
-
-

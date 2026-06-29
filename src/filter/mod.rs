@@ -1,19 +1,10 @@
 use crate::har::EntrySummary;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StatusGroup {
-    Informational,
-    Success,
-    Redirect,
-    ClientError,
-    ServerError,
-}
-
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FilterQuery {
     pub text: String,
     pub method: Option<String>,
-    pub status_group: Option<StatusGroup>,
+    pub status_class: Option<u16>,
     pub mime_category: Option<String>,
 }
 
@@ -25,8 +16,8 @@ impl FilterQuery {
             }
         }
 
-        if let Some(group) = self.status_group {
-            if !group.matches(summary.status) {
+        if let Some(class) = self.status_class {
+            if summary.status / 100 != class {
                 return false;
             }
         }
@@ -65,21 +56,9 @@ impl FilterQuery {
     }
 }
 
-impl StatusGroup {
-    pub fn matches(self, status: u16) -> bool {
-        match self {
-            StatusGroup::Informational => (100..200).contains(&status),
-            StatusGroup::Success => (200..300).contains(&status),
-            StatusGroup::Redirect => (300..400).contains(&status),
-            StatusGroup::ClientError => (400..500).contains(&status),
-            StatusGroup::ServerError => (500..600).contains(&status),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{FilterQuery, StatusGroup};
+    use super::FilterQuery;
     use crate::har::EntrySummary;
 
     fn sample(status: u16, method: &str, mime: &str, duration_ms: f64) -> EntrySummary {
@@ -91,7 +70,6 @@ mod tests {
             path: "/v1/users".to_string(),
             status,
             mime: mime.to_string(),
-            req_bytes: 10,
             res_bytes: 20,
             duration_ms,
         }
@@ -102,7 +80,7 @@ mod tests {
         let summary = sample(404, "GET", "application/json", 230.0);
         let query = FilterQuery {
             text: "users".to_string(),
-            status_group: Some(StatusGroup::ClientError),
+            status_class: Some(4),
             ..FilterQuery::default()
         };
         assert!(query.matches(&summary));

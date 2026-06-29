@@ -84,7 +84,7 @@ fn derive_host(url: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::har::{EntryDetail, TimingBreakdown};
+    use crate::har::EntryDetail;
 
     use super::{build_request_message, build_response_message, pretty_json_if_possible};
 
@@ -107,9 +107,6 @@ mod tests {
                 "application/json; charset=utf-8".to_string(),
             )],
             response_body: "{\"success\":true,\"id\":146047}".to_string(),
-            timings: TimingBreakdown::default(),
-            server_ip: None,
-            connection: None,
         }
     }
 
