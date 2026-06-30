@@ -71,10 +71,6 @@ cargo check --target wasm32-unknown-unknown
 - `style/main.css` app styling
 - `index.html` Trunk entry point
 
-## Notes
-
-- The app is intended to run in the browser. Running the native binary prints a message and exits.
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
